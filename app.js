@@ -4,8 +4,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
-const md5 = require('md5');
-
+const bcrypt = require('bcrypt'); // hash function package
+const saltRounds = 10;
 
 const app = express();
 // Express & EJS setup
@@ -42,34 +42,50 @@ app.get("/register", (req, res) =>{
 
 
 app.post("/register", (req, res) => {
-    const newUser = new User({
-        email: req.body.username,
-        password: md5(req.body.password)
+    
+    bcrypt.genSalt(saltRounds, (err, salt) => {
+        bcrypt.hash(req.body.password, salt, (err, hash) => {
+            if(err){
+                console.log(err);
+            } else{
+                const newUser = new User({
+                    email: req.body.username,
+                    password: hash
+                });
+            
+                newUser.save((err) =>{ // will automatically encrypt 
+                    if(err){
+                        console.log(err);
+                    } else{
+                        res.render("secrets");
+                    }
+                });
+            }
+               
+        });
     });
+    
 
-    newUser.save((err) =>{ // will automatically encrypt 
-        if(err){
-            console.log(err);
-        } else{
-            res.render("secrets");
-        }
-    });
 
 });
 
 app.post("/login", (req, res) =>{
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
+
 
     User.findOne({email: username}, (err, foundUser) => { // will automatically decrypt
         if(err){
             console.log(err);
         } else{
             if(foundUser){
-                if(foundUser.password === password){
-                    console.log("Login Success");
-                    res.render("secrets");
-                }
+                bcrypt.compare(password, foundUser.password, (err, result) => {
+                    if(result === true){
+                        res.render("secrets");
+                    } else{
+                        res.render("login");
+                    }
+                });
             }
         }
     });
